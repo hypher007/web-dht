@@ -18,7 +18,7 @@ function DHT(cb){
   this.router = new Router();
   this.arithmetic = new Arithmetic();
   this.reactor = new Reactor();
-  this.peer = new Peer({ key: 'lwjd5qra8257b9', debug: 2 });
+  this.peer = new Peer({ key: 'lwjd5qra8257b9', debug: 3 });
   var _dht = this;
   this.peer.on('open', function(peerId){
     _dht._onPeerCreated(peerId, cb);
@@ -39,9 +39,12 @@ DHT.prototype._protocols = {
 
 DHT.prototype._onPeerCreated = function(peerId, cb) {
   this.router.initialize(this.peer); // initialize the router with this peer
-  this.peer.on('connection', this._onConnectionReceived);
+  var _dht = this;
+  this.peer.on('connection', function(dataConnection){
+    _dht._onConnectionReceived(dataConnection);
+  });
   this.ready = true;
-  cb();
+  cb(this.peer);
 };
 
 DHT.prototype._onConnectionReceived = function (dataConnection){
@@ -62,17 +65,17 @@ DHT.prototype._configureDataConnection = function(dataConnection){
   });
 };
 
-DHT.prototype._onDataReceived = function(data){
-  var protocol = data.protocol ? data.protocol: 'none';
+DHT.prototype._onDataReceived = function(message){
+  var protocol = message.protocol ? message.protocol: 'none';
   console.log('message type ' + protocol);
   switch(protocol){
     case this._protocols.JOIN:
       // a new node wants to join the network
-      this._onJoin(data);
+      this._onJoin(message);
       break;
     case this._protocols.CONNECT:
       // a new node has joined
-    	this._onConnect(data);
+    	this._onConnect(message);
       break;
     case this._protocols.PING:
       break;

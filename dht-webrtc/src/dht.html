@@ -1,0 +1,54 @@
+<html>
+<head>
+  <script type="text/javascript" src="../../dht-lib/lib/jquery-1.11.0.js"></script>
+  <script type="text/javascript" src="../../dht-lib/lib/peer.js"></script>
+  <script type="text/javascript" src="../../dht-lib/lib/jsbn.js"></script>
+  <script type="text/javascript" src="../../dht-lib/lib/jsbn2.js"></script>
+  <script type="text/javascript" src="../../dht-lib/lib/sha1.js"></script>
+  <script type="text/javascript" src="../../dht-core/src/arithmetic.js"></script>
+  <script type="text/javascript" src="../../dht-core/src/reactor.js"></script>
+  <script type="text/javascript" src="../../dht-core/src/replication.js"></script>
+  <script type="text/javascript" src="../../dht-core/src/router.js"></script>
+  <script type="text/javascript" src="../../dht-core/src/storage.js"></script>
+  <script type="text/javascript" src="dht.js"></script>
+</head>
+
+<body>
+
+<div>
+  Open the console to find the peer identifier and keep track of the communication :)
+</div>
+<div>
+  Enter peer Id <input type="text" id="peerId" />
+  <input type="button" id="connectToPeer" value="Connect to peer" size="25"/>
+  <input type="button" id="sendPing" value="Send ping"/>
+</div>
+
+  <div>
+  Store data <input type="text" id="data" size="55"/>
+  <input type="button" id="store" value="Store"/>
+</div>
+<div>
+  Enter key <input type="text" id="key" size="55"/>
+  <input type="button" id="findKey" value="Find key"/>
+</div>
+  
+<div id="data"></div>
+
+</body>
+<script type="text/javascript">
+  var dht;
+  $(document).ready(function(){
+    console.log("Loading");
+    dht = new DHT(displayId);
+    $("#connectToPeer").click(connect);
+  });
+  var displayId = function(peer){
+    console.log("Peer id is " + peer.id);
+  };
+  var connect = function(){
+    var knownPeer = $("#peerId").val();
+    dht.join(knownPeer);
+  };
+</script>
+</html>
