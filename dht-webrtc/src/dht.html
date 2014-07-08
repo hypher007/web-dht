@@ -61,7 +61,8 @@
       buff += '<p>';
       buff += peer;
       buff += ' ---> ';
-      buff += dht.router.getRoutes(peer).join();
+      if(dht.router.getRoutes(peer))
+        buff += dht.router.getRoutes(peer).join();
       buff += '</p>';
     }
     $("#debug").html(buff);
