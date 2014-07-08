@@ -2,6 +2,8 @@ function Arithmetic (){
   this.type= 'XOR';
 }
 
+// TODO: This function is returning the bit array!!! 
+
 Arithmetic.prototype.findNearest = function(peerTo, peers){
   // Remove the peerTo from the peers to avoid calculating the distance from the peer to itself.
   for(var i = peers.length - 1; i--;){
@@ -14,18 +16,21 @@ Arithmetic.prototype.findNearest = function(peerTo, peers){
   for(var i in peers){
     sha1Peer = Sha1.hash(peers[i]);
     bitKeyPeer = new BigInteger(sha1Peer, 16);
-    xorDistances.push(bitKeyPeerTo.xor(bitKeyPeer));
+    xorDistances.push({
+      peer: peers[i],
+      bitKey: bitKeyPeerTo.xor(bitKeyPeer),
+    });
   }
   return this._getLowestBitKey(xorDistances);
 };
 
 Arithmetic.prototype._getLowestBitKey = function(array){
   if(array.length === 0) return null;
-  var min = array.pop();
+  var pairKeyPeer = array.pop();
   for(var i in array){
-    if(min.compareTo(array[i]) < 0) min = array[i];
+    if(pairKeyPeer.bitKey.compareTo(array[i].bitKey) < 0) pairKeyPeer = array[i];
   }
-  return min;
+  return pairKeyPeer.peer;
 };
 
 Arithmetic.prototype.lessThan = function(peerA, peerB){

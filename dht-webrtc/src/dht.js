@@ -50,18 +50,22 @@ DHT.prototype._onPeerCreated = function(peerId, cb) {
 DHT.prototype._onConnectionReceived = function (dataConnection){
   this._configureDataConnection(dataConnection);
   // this.replication.redistributeKeys();
-  var message = this._buildMessage(dataConnection.peer, this._protocols.ROUTES);
-  message.routes = this.router.myConnections();
-  this._unicast(dataConnection.peer, message);
+  var _dht = this;
+  dataConnection.on('open', function(){
+    _dht.router.addRoute(dataConnection.peer, _dht.peer.id);
+    var message = _dht._buildMessage(dataConnection.peer, _dht._protocols.ROUTES);
+    message.routes = _dht.router.myConnections();
+    dataConnection.send(message);
+  });
 };
 
 DHT.prototype._configureDataConnection = function(dataConnection){
   var _dht = this;
-  dataConnection.on('data', function(){
+  dataConnection.on('data', function(data){
     _dht._onDataReceived(data);
   });
   dataConnection.on('close', function(){
-    _dht._onDisconnect(dataConnection.peer);
+    _dht._onDisconnect(this.peer);
   });
 };
 
@@ -75,7 +79,7 @@ DHT.prototype._onDataReceived = function(message){
       break;
     case this._protocols.CONNECT:
       // a new node has joined
-    	this._onConnect(message);
+      this._connect(message.newPeer);
       break;
     case this._protocols.PING:
       break;
@@ -97,7 +101,8 @@ DHT.prototype._onDataReceived = function(message){
 
 /* Wrapper for connecting to another peer */
 
-DHT.prototype._connect = function(newPeer, connections){
+DHT.prototype._connect = function(newPeer){
+  connections = this.router.myConnections();
   if(connections.indexOf(newPeer) > -1)
     return false;
   this._setConnectTrigger(newPeer, connections);
@@ -111,7 +116,7 @@ DHT.prototype._setConnectTrigger = function(newPeer, connections){
   this.reactor.setTrigger(newPeer, function(){
     var message = _dht._buildMessage(newPeer, _dht._protocols.ROUTES);
     message.routes = connections;
-    _dht._unicast(newPeer, message);
+    this.router.unicast(newPeer, message);
   });
 };
 
@@ -120,35 +125,31 @@ DHT.prototype._setJoinTrigger = function(knownPeer){
   this.reactor.setTrigger(knownPeer, function(){
     var message = _dht._buildMessage(knownPeer, _dht._protocols.JOIN);
     message.newPeer = _dht.peer.id;
-    _dht._unicast(knownPeer, message);
+    _dht.router.unicast(knownPeer, message);
   });
 };
 
-/* Perhaps this function can be moved to the router. */
-
 /* Protocol events */
-
-DHT.prototype._onConnect = function(message){
-  var newPeer = message.newPeer;
-  var connections = this.router.myConnections();
-  this._connect(newPeer, connections);
-};
 
 DHT.prototype._onJoin = function(message){
   if(message.trace.length > 64)
     return false;
   var newPeer = message.newPeer;
+  // there is a problem when there is just one connection
+  // the message trace contains that one that is already in the peer connections
+  // thus the peer gets connected again
+  // that is myConnections is an empty array.
   var myConnections = this.router.filterConnections(this.router.myConnections(), message.trace);
   var nearest = this.arithmetic.findNearest(newPeer, myConnections.concat([this.peer.id]));
   if(this.peer.id === nearest){
-    this._connect(newPeer, myConnections);
+    this._connect(newPeer);
     this._attachEnd(newPeer, myConnections);
     return true;
   }
   message.peerTo = nearest;
   message.peerFrom = this.peer.id;
   message.trace.push(this.peer.id);
-  this._unicast(nearest, message);
+  this.router.unicast(nearest, message);
   return false;
 };
 
@@ -159,13 +160,14 @@ DHT.prototype._attachEnd = function (newPeer, connections){
     if(this.arithmetic.checkBetween(this.peer.id, peerTo, connections[i]))
       possiblePeers.push(connections[i]);
   }
-  if(possiblePeers.length === 0) return false;
+  if(possiblePeers.length === 0)
+    return false;
   var nearest = this.arithmetic.findNearest(newPeer, possiblePeers);
-  if(nearest){
-    var message = this._buildMessage(nearest, this._protocols.CONNECT);
-    message.newPeer = newPeer;
-    this._unicast(nearest, message);
-  }
+  if(!nearest)
+    return false;
+  var message = this._buildMessage(nearest, this._protocols.CONNECT);
+  message.newPeer = newPeer;
+  this.router.unicast(nearest, message);
   return true;
 };
 
@@ -173,21 +175,21 @@ DHT.prototype._onDisconnect = function(peer){
   // here we will reconnect to the closest peer connected to the lost one
   // following the direction always, either greater or lower than this peer's id
   var routes = this.router.getRoutes(peer);
-  if(this.arithmetic.lessThan(this.peer.id, peer)){
-    // check only routes that have an id lower that this peer
-    routes = this.arithmetic.filterLowerThan(routes, peer);
-  } else {
-    // check only routes that have an id greater that this peer
+  // check only routes that have an id lower or greater that this peer
+  this.arithmetic.lessThan(this.peer.id, peer)?
+    routes = this.arithmetic.filterLowerThan(routes, peer):
     routes = this.arithmetic.filterGreaterThan(routes, peer);
-  }
-  var connections = this.router.myConnections();
   var nearest = this.arithmetic.findNearest(routes);
-  this._connect(nearest, connections);
+  if(!nearest)
+    return false;
+  this._connect(nearest);
+  return true;
 };
 
 DHT.prototype._onRoutes = function(message){
   this.router.updateRoutes(message.peerFrom, message.routes);
   // Call any action that was scheduled in the reactor.
+  // or shall we use merely dataConnection.on('open', function(){}); 
   this.reactor.activate(message.peerFrom);
 };
 
@@ -200,10 +202,6 @@ DHT.prototype._buildMessage = function(peerTo, protocol){
     peerTo: peerTo,
     trace: [this.peer.id],
   };
-};
-
-DHT.prototype._unicast = function(peerTo, message){
-  this.router.send(peerTo, message);
 };
 
 /* Public methods */

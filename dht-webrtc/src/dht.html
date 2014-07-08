@@ -32,8 +32,12 @@
   Enter key <input type="text" id="key" size="55"/>
   <input type="button" id="findKey" value="Find key"/>
 </div>
-  
-<div id="data"></div>
+ 
+<div>
+  <input type="button" id="routes" value="Show routes"/>
+</div>
+
+<div id="debug"></div>
 
 </body>
 <script type="text/javascript">
@@ -42,6 +46,7 @@
     console.log("Loading");
     dht = new DHT(displayId);
     $("#connectToPeer").click(connect);
+    $("#routes").click(showRoutes);
   });
   var displayId = function(peer){
     console.log("Peer id is " + peer.id);
@@ -49,6 +54,17 @@
   var connect = function(){
     var knownPeer = $("#peerId").val();
     dht.join(knownPeer);
+  };
+  var showRoutes = function(){
+    var buff = '';
+    for(var peer in dht.peer.connections){
+      buff += '<p>';
+      buff += peer;
+      buff += ' ---> ';
+      buff += dht.router.getRoutes(peer).join();
+      buff += '</p>';
+    }
+    $("#debug").html(buff);
   };
 </script>
 </html>

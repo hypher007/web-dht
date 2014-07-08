@@ -13,6 +13,7 @@ Router.prototype._getConnection = function(peerId){
       if(this.peer.connections[peerId][con].open){
         return this.peer.connections[peerId][con];
       }
+      // return this.peer.connections[peerId][con];
     }
   }
   return null;
@@ -58,7 +59,7 @@ Router.prototype.filterConnections = function(connections, remove){
 
 /* Low-level transmission/communication tasks */
 
-Router.prototype.send = function(peer, message){
+Router.prototype.unicast = function(peer, message){
   var conn = this._getConnection(peer);
   if(!conn)
     return false;
