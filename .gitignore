@@ -5,3 +5,5 @@ dht-lib/.settings/
 dht-webrtc/.project
 dht-webrtc/.settings/
 .metadata/
+.project
+.settings/
