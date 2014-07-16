@@ -18,7 +18,7 @@ function DHT(cb){
   this.router = new Router();
   this.arithmetic = new Arithmetic();
   this.reactor = new Reactor();
-  this.peer = new Peer({ key: 'lwjd5qra8257b9', debug: 3 });
+  this.peer = new Peer({ key: 'lwjd5qra8257b9', debug: 2 });
   var _dht = this;
   this.peer.on('open', function(peerId){
     _dht._onPeerCreated(peerId, cb);
@@ -44,6 +44,9 @@ DHT.prototype._onPeerCreated = function(peerId, cb) {
     _dht._onConnectionReceived(dataConnection);
   });
   this.ready = true;
+  var hashedId = Sha1.hash(this.peer.id);
+  var hexId = new BigInteger(hashedId, 16);
+  console.log("The hex id is " + hexId.toString(16));
   cb(this.peer);
 };
 
@@ -143,7 +146,9 @@ DHT.prototype._onJoin = function(message){
   var nearest = this.arithmetic.findNearest(newPeer, myConnections.concat([this.peer.id]));
   if(this.peer.id === nearest){
     this._connect(newPeer);
-    this._attachEnd(newPeer, myConnections);
+    // it is important to send a fresh snapshot to place the new peer
+    // between the proper neighbors
+    this._attachEnd(newPeer, this.router.myConnections());
     return true;
   }
   message.peerTo = nearest;
