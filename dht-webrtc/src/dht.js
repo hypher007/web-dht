@@ -116,7 +116,7 @@ DHT.prototype._setConnectTrigger = function(newPeer, connections){
   this.reactor.setTrigger(newPeer, function(){
     var message = _dht._buildMessage(newPeer, _dht._protocols.ROUTES);
     message.routes = connections;
-    this.router.unicast(newPeer, message);
+    _dht.router.unicast(newPeer, message);
   });
 };
 
@@ -157,7 +157,7 @@ DHT.prototype._attachEnd = function (newPeer, connections){
   // Connect to the new peer from the other side.
   var possiblePeers = new Array();
   for(var i in connections){
-    if(this.arithmetic.checkBetween(this.peer.id, peerTo, connections[i]))
+    if(this.arithmetic.checkBetween(this.peer.id, newPeer, connections[i]))
       possiblePeers.push(connections[i]);
   }
   if(possiblePeers.length === 0)
