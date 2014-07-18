@@ -57,12 +57,18 @@
   };
   var showRoutes = function(){
     var buff = '';
+    var routes;
     for(var peer in dht.peer.connections){
       buff += '<p>';
       buff += peer;
+      routes = dht.router.getRoutesOf(peer);
+      if(!routes){
+        buff += '</p>';
+        continue;
+      }
       buff += ' ---> ';
-      if(dht.router.getRoutes(peer))
-        buff += dht.router.getRoutes(peer).join();
+      for(var i = 0; i < routes.length; i ++)
+        buff += routes[i] + '  *  ';
       buff += '</p>';
     }
     $("#debug").html(buff);

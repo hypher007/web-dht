@@ -55,7 +55,8 @@ DHT.prototype._onConnectionReceived = function (dataConnection){
   // this.replication.redistributeKeys();
   var _dht = this;
   dataConnection.on('open', function(){
-    _dht.router.addRoute(dataConnection.peer, _dht.peer.id);
+    _dht.router.createRoute(dataConnection.peer);
+    _dht._notifyRoute(dataConnection.peer, true);
     var message = _dht._buildMessage(dataConnection.peer, _dht._protocols.ROUTES);
     message.routes = _dht.router.myConnections();
     dataConnection.send(message);
@@ -70,6 +71,22 @@ DHT.prototype._configureDataConnection = function(dataConnection){
   dataConnection.on('close', function(){
     _dht._onDisconnect(this.peer);
   });
+};
+
+DHT.prototype._notifyRoute = function(peer, add){
+  var neighbors = this.router.myConnections();
+  // do not notify the new connected peer
+  for(var i = neighbors.length - 1; i >= 0; i--){
+    if (neighbors[i] === peer)
+      neighbors.splice(i, 1);
+  }
+  if(neighbors.length === 0)
+    return false;
+  var message = this._buildMessage("", this._protocols.ROUTES);
+  message.route = peer;
+  message.add = add;
+  this.router.multicast(neighbors, message);
+  return true;
 };
 
 DHT.prototype._onDataReceived = function(message){
@@ -108,17 +125,22 @@ DHT.prototype._connect = function(newPeer){
   connections = this.router.myConnections();
   if(connections.indexOf(newPeer) > -1)
     return false;
-  this._setConnectTrigger(newPeer, connections);
+  this._setConnectTrigger(newPeer);
   var dataConnection = this.peer.connect(newPeer);
   this._configureDataConnection(dataConnection);
   return true;
 };
 
-DHT.prototype._setConnectTrigger = function(newPeer, connections){
+DHT.prototype._setConnectTrigger = function(newPeer){
   var _dht = this;
   this.reactor.setTrigger(newPeer, function(){
+    // we are here because we send a join message to a peer
+    // that peer replied with its routes
+    // now we now this peer has just exchanged the handshake
+    // so then we notify our neighbors of this new peer
+    _dht._notifyRoute(newPeer, true);
     var message = _dht._buildMessage(newPeer, _dht._protocols.ROUTES);
-    message.routes = connections;
+    message.routes = _dht.router.myConnections();
     _dht.router.unicast(newPeer, message);
   });
 };
@@ -126,6 +148,7 @@ DHT.prototype._setConnectTrigger = function(newPeer, connections){
 DHT.prototype._setJoinTrigger = function(knownPeer){
   var _dht = this;
   this.reactor.setTrigger(knownPeer, function(){
+    _dht._notifyRoute(knownPeer, true);
     var message = _dht._buildMessage(knownPeer, _dht._protocols.JOIN);
     message.newPeer = _dht.peer.id;
     _dht.router.unicast(knownPeer, message);
@@ -159,7 +182,7 @@ DHT.prototype._onJoin = function(message){
 };
 
 DHT.prototype._attachEnd = function (newPeer, connections){
-  // Connect to the new peer from the other side.
+  // Connect the new peer to a higher or lower (numerical value) peer.
   var possiblePeers = new Array();
   for(var i in connections){
     if(this.arithmetic.checkBetween(this.peer.id, newPeer, connections[i]))
@@ -176,23 +199,29 @@ DHT.prototype._attachEnd = function (newPeer, connections){
   return true;
 };
 
+
 DHT.prototype._onDisconnect = function(peer){
-  // here we will reconnect to the closest peer connected to the lost one
-  // following the direction always, either greater or lower than this peer's id
-  var routes = this.router.getRoutes(peer);
-  // check only routes that have an id lower or greater that this peer
-  this.arithmetic.lessThan(this.peer.id, peer)?
-    routes = this.arithmetic.filterLowerThan(routes, peer):
-    routes = this.arithmetic.filterGreaterThan(routes, peer);
-  var nearest = this.arithmetic.findNearest(routes);
-  if(!nearest)
+  var neighbors = this.router.getRoutesOf(peer);
+  if(!neighbors)
     return false;
+  var nearest = this.arithmetic.findNearest(peer, neighbors);
+  this.router.removeRoute(peer);
+  this._notifyRoute(peer, false);
+  if(!nearest){
+    // choose another peer from the look ahead routes...
+    return false;
+  }
   this._connect(nearest);
   return true;
 };
 
 DHT.prototype._onRoutes = function(message){
-  this.router.updateRoutes(message.peerFrom, message.routes);
+  if(message.routes)
+    this.router.updateRoutesOf(message.peerFrom, message.routes);
+  else if(message.route)
+    message.add ? 
+      this.router.updateRoutesOf(message.peerFrom, [message.route]):
+      this.router.removeRouteFromAny(message.route);
   // Call any action that was scheduled in the reactor.
   // or shall we use merely dataConnection.on('open', function(){}); 
   this.reactor.activate(message.peerFrom);

@@ -3,8 +3,10 @@ function Arithmetic (){
 }
 
 Arithmetic.prototype.findNearest = function(peerTo, peers){
+  if(!peers || !peers.length)
+    return null;
   // Remove the peerTo from the peers to avoid calculating the distance from the peer to itself.
-  for(var i = peers.length - 1; i--;){
+  for(var i = peers.length - 1; i >= 0; i--){
     if (peers[i] === peerTo)
       peers.splice(i, 1);
   }
