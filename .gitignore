@@ -4,6 +4,8 @@ dht-lib/.project
 dht-lib/.settings/
 dht-webrtc/.project
 dht-webrtc/.settings/
+test-dht-core/.project
+test-dht-core/.settings
 .metadata/
 .project
 .settings/
